@@ -1,0 +1,40 @@
+name: Deobfuscate Script
+
+on:
+  workflow_dispatch:
+    inputs:
+      script_url:
+        description: 'URL of the obfuscated script'
+        required: true
+        type: string
+
+jobs:
+  deobfuscate:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Python dependencies
+        run: pip install aiohttp requests
+
+      - name: Download the obfuscated script
+        run: |
+          curl -L "${{ github.event.inputs.script_url }}" -o ./dumps/original/target.lua
+        shell: cmd
+
+      - name: Run the deobfuscator (httplog2)
+        run: |
+          lune run httplog2.lua target.lua
+        shell: cmd
+
+      - name: Upload deobfuscated result
+        uses: actions/upload-artifact@v4
+        with:
+          name: deobfuscated-script
+          path: ./dumps/dumped/
