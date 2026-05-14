@@ -56,8 +56,7 @@ jobs:
       - name: Run deobfuscator (httplog2)
         shell: cmd
         run: |
-          cd dumps\original
-          lune run ../../httplog2.lua target.lua
+          lune run httplog2.lua dumps\original\target.lua
 
       - name: Upload result
         uses: actions/upload-artifact@v4
