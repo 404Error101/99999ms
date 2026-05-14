@@ -23,10 +23,26 @@ jobs:
       - name: Install Python dependencies
         run: pip install aiohttp requests
 
+      - name: Create necessary folders
+        run: |
+          mkdir dumps\original
+          mkdir dumps\dumped
+          mkdir dumps\beautify
+          mkdir unobfuscated
+          mkdir obfuscated
+        shell: cmd
+
       - name: Download the obfuscated script
         run: |
-          curl -L "${{ github.event.inputs.script_url }}" -o ./dumps/original/target.lua
+          curl -L "${{ github.event.inputs.script_url }}" -o dumps\original\target.lua
         shell: cmd
+
+      - name: Install Lune
+        run: |
+          curl -L https://github.com/lune-org/lune/releases/download/v0.8.6/lune-windows-x86_64.zip -o lune.zip
+          unzip lune.zip -d lune_folder
+          echo "C:\lune_folder" >> $env:GITHUB_PATH
+        shell: pwsh
 
       - name: Run the deobfuscator (httplog2)
         run: |
