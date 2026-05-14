@@ -40,7 +40,7 @@ jobs:
       - name: Install Lune
         shell: pwsh
         run: |
-          $luneUrl = "https://github.com/lune-org/lune/releases/download/v0.8.6/lune-windows-x86_64.zip"
+          $luneUrl = "https://github.com/lune-org/lune/releases/download/v0.10.4/lune-0.10.4-windows-x86_64.zip"
           $zipPath = "lune.zip"
           Invoke-WebRequest -Uri $luneUrl -OutFile $zipPath -UseBasicParsing
           Expand-Archive -Path $zipPath -DestinationPath "lune_folder"
