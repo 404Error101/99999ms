@@ -1,16 +1,13 @@
-name: Deobfuscate Script
+name: Run Discord Bot
 
 on:
-  workflow_dispatch:
-    inputs:
-      script_url:
-        description: 'URL of the obfuscated script'
-        required: true
-        type: string
+  workflow_dispatch:  # manual trigger
+  schedule:
+    - cron: '0 */6 * * *'   # every 6 hours (optional auto‑restart)
 
 jobs:
-  deobfuscate:
-    runs-on: windows-latest
+  run-bot:
+    runs-on: windows-latest   # need Windows for the .exe binaries
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -20,46 +17,30 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Install Python dependencies
-        run: pip install aiohttp requests
+      - name: Install Python deps
+        run: pip install discord.py aiohttp pillow
 
-      - name: Create necessary folders
-        shell: cmd
-        run: |
-          mkdir dumps\original
-          mkdir dumps\dumped
-          mkdir dumps\beautify
-          mkdir unobfuscated
-          mkdir obfuscated
-
-      - name: Download the obfuscated script
-        shell: cmd
-        run: |
-          curl -L "${{ github.event.inputs.script_url }}" -o dumps\original\target.lua
-
-      - name: Install Lune
+      - name: Install Lune (same as before)
         shell: pwsh
         run: |
           $luneUrl = "https://github.com/lune-org/lune/releases/download/v0.10.4/lune-0.10.4-windows-x86_64.zip"
-          $zipPath = "lune.zip"
-          Invoke-WebRequest -Uri $luneUrl -OutFile $zipPath -UseBasicParsing
-          Expand-Archive -Path $zipPath -DestinationPath "lune_folder"
-          $lunePath = "$pwd\lune_folder"
-          echo "LUNE_PATH=$lunePath" >> $env:GITHUB_ENV
-          echo "$lunePath" >> $env:GITHUB_PATH
+          Invoke-WebRequest -Uri $luneUrl -OutFile lune.zip -UseBasicParsing
+          Expand-Archive -Path lune.zip -DestinationPath lune_folder
+          echo "$pwd\lune_folder" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
-      - name: Verify Lune installation
-        shell: cmd
+      - name: Patch require paths (same as before)
+        shell: pwsh
         run: |
-          lune --version
+          $files = @("httplog2.lua", "exec_env.lua", "MSecAntiTamper.lua")
+          foreach ($f in $files) {
+            if (Test-Path $f) {
+              (Get-Content $f -Raw) -replace 'require\("([^@\./][^"]*)"\)', 'require("./$1")' | Set-Content $f -NoNewline
+            }
+          }
 
-      - name: Run deobfuscator (httplog2)
-        shell: cmd
+      - name: Run the bot
+        env:
+          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}   # store your token in GitHub Secrets
         run: |
-          lune run httplog2.lua dumps\original\target.lua
-
-      - name: Upload result
-        uses: actions/upload-artifact@v4
-        with:
-          name: deobfuscated-script
-          path: ./dumps/dumped/
+          python bot.py
+        shell: cmd
