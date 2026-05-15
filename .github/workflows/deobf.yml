@@ -38,7 +38,7 @@ jobs:
       - name: Install darklua
         shell: pwsh
         run: |
-          $url = "https://github.com/seaofvoices/darklua/releases/download/v0.13.0/darklua-x86_64-pc-windows-msvc.zip"
+          $url = "https://github.com/seaofvoices/darklua/releases/download/v0.18.0/darklua-windows-x86_64.zip"
           Invoke-WebRequest -Uri $url -OutFile darklua.zip -UseBasicParsing
           Expand-Archive -Path darklua.zip -DestinationPath darklua_folder
           Copy-Item "darklua_folder\darklua.exe" -Destination ".\darklua.exe"
