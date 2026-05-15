@@ -1,13 +1,13 @@
-name: Run Discord Bot
+name: Run 25ms Discord Bot
 
 on:
-  workflow_dispatch:  # manual trigger
+  workflow_dispatch:          # Manual trigger from Actions tab
   schedule:
-    - cron: '0 */6 * * *'   # every 6 hours (optional auto‑restart)
+    - cron: '0 */6 * * *'     # Restart every 6 hours (optional)
 
 jobs:
   run-bot:
-    runs-on: windows-latest   # need Windows for the .exe binaries
+    runs-on: windows-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -17,30 +17,43 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Install Python deps
-        run: pip install discord.py aiohttp pillow
+      - name: Install Python dependencies
+        run: |
+          pip install discord.py aiohttp pillow requests
 
-      - name: Install Lune (same as before)
+      - name: Create required directories
+        shell: cmd
+        run: |
+          mkdir dumps\original
+          mkdir dumps\dumped
+          mkdir dumps\beautify
+          mkdir unobfuscated
+          mkdir obfuscated
+          mkdir deobfuscate\.in
+          mkdir deobfuscate\.out
+
+      - name: Install Lune (for .l command)
         shell: pwsh
         run: |
-          $luneUrl = "https://github.com/lune-org/lune/releases/download/v0.10.4/lune-0.10.4-windows-x86_64.zip"
-          Invoke-WebRequest -Uri $luneUrl -OutFile lune.zip -UseBasicParsing
+          $url = "https://github.com/lune-org/lune/releases/download/v0.10.4/lune-0.10.4-windows-x86_64.zip"
+          Invoke-WebRequest -Uri $url -OutFile lune.zip -UseBasicParsing
           Expand-Archive -Path lune.zip -DestinationPath lune_folder
           echo "$pwd\lune_folder" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
-      - name: Patch require paths (same as before)
+      - name: Patch Lua require paths
         shell: pwsh
         run: |
-          $files = @("httplog2.lua", "exec_env.lua", "MSecAntiTamper.lua")
+          $files = @("httplog2.lua","exec_env.lua","MSecAntiTamper.lua","unpack_dumper.lua","badluaobf.lua","luraphdump.lua","loadstringlog.lua")
           foreach ($f in $files) {
             if (Test-Path $f) {
-              (Get-Content $f -Raw) -replace 'require\("([^@\./][^"]*)"\)', 'require("./$1")' | Set-Content $f -NoNewline
+              $content = Get-Content $f -Raw
+              $content = $content -replace 'require\("([^@\./][^"]*)"\)', 'require("./$1")'
+              Set-Content $f $content -NoNewline
             }
           }
 
-      - name: Run the bot
+      - name: Run Discord bot
         env:
-          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}   # store your token in GitHub Secrets
-        run: |
-          python bot.py
+          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
         shell: cmd
+        run: python bot.py
