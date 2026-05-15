@@ -25,14 +25,12 @@ jobs:
         shell: cmd
         run: |
           mkdir dumps\original dumps\dumped dumps\beautify
-          mkdir unobfuscated obfuscated deobfuscate\.in deobfuscate\.out
-          mkdir MoonsecDeobfuscatorBin
+          mkdir unobfuscated obfuscated
 
       # ========== USE EXISTING LUNE.EXE ==========
       - name: Add lune.exe to PATH
         shell: pwsh
         run: |
-          # Check if lune.exe exists in root or a subfolder
           $lune = Get-ChildItem -Path . -Recurse -Filter "lune.exe" | Select-Object -First 1
           if ($lune) {
             $dir = $lune.DirectoryName
@@ -58,14 +56,13 @@ jobs:
             exit 1
           }
 
-      # ========== DOWNLOAD DARKLUA (since you don't have it) ==========
+      # ========== DOWNLOAD DARKLUA ==========
       - name: Install darklua
         shell: pwsh
         run: |
           $url = "https://github.com/seaofvoices/darklua/releases/download/v0.18.0/darklua-windows-x86_64.zip"
           Invoke-WebRequest -Uri $url -OutFile darklua.zip -UseBasicParsing
           Expand-Archive -Path darklua.zip -DestinationPath darklua_folder
-          # The zip may contain a single exe or a folder
           $exe = Get-ChildItem -Path darklua_folder -Recurse -Filter "darklua.exe" | Select-Object -First 1
           if ($exe) {
             Copy-Item $exe.FullName -Destination "darklua.exe"
@@ -73,24 +70,6 @@ jobs:
           } else {
             Write-Host "darklua.exe not found in extracted files"
             exit 1
-          }
-
-      # ========== DOWNLOAD MOONSEC DEOBFUSCATOR (if not in repo) ==========
-      - name: Install MoonsecDeobfuscator
-        shell: pwsh
-        run: |
-          $existing = Get-ChildItem -Path . -Recurse -Filter "MoonsecDeobfuscator.exe" | Select-Object -First 1
-          if (-not $existing) {
-            $url = "https://github.com/fuad1508/MoonsecDeobfuscator/releases/download/v1.0/MoonsecDeobfuscator.zip"
-            Invoke-WebRequest -Uri $url -OutFile moonsec.zip -UseBasicParsing
-            Expand-Archive -Path moonsec.zip -DestinationPath MoonsecDeobfuscatorBin
-            # Move exe to the root of that folder
-            $exe = Get-ChildItem -Path MoonsecDeobfuscatorBin -Recurse -Filter "*.exe" | Select-Object -First 1
-            if ($exe) {
-              Move-Item $exe.FullName -Destination "MoonsecDeobfuscatorBin\MoonsecDeobfuscator.exe" -Force
-            }
-          } else {
-            Write-Host "MoonsecDeobfuscator.exe already exists in repo – skipping download"
           }
 
       # ========== PATCH LUA REQUIRES (fix .l command) ==========
