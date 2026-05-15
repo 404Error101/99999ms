@@ -17,78 +17,84 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Install Python deps
+      - name: Install Python dependencies
         run: pip install discord.py aiohttp pillow requests
 
+      # ========== CREATE DIRECTORIES ==========
       - name: Create directories
         shell: cmd
         run: |
           mkdir dumps\original dumps\dumped dumps\beautify
           mkdir unobfuscated obfuscated deobfuscate\.in deobfuscate\.out
-          mkdir MoonsecDeobfuscatorBin medal51 ib2\main
+          mkdir MoonsecDeobfuscatorBin
 
-      - name: Install Lune
+      # ========== USE EXISTING LUNE.EXE ==========
+      - name: Add lune.exe to PATH
         shell: pwsh
         run: |
-          $url = "https://github.com/lune-org/lune/releases/download/v0.10.4/lune-0.10.4-windows-x86_64.zip"
-          Invoke-WebRequest -Uri $url -OutFile lune.zip -UseBasicParsing
-          Expand-Archive -Path lune.zip -DestinationPath lune_folder
-          echo "$pwd\lune_folder" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          # Check if lune.exe exists in root or a subfolder
+          $lune = Get-ChildItem -Path . -Recurse -Filter "lune.exe" | Select-Object -First 1
+          if ($lune) {
+            $dir = $lune.DirectoryName
+            echo "$dir" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+            Write-Host "Found lune.exe in $dir"
+          } else {
+            Write-Host "lune.exe not found in repo – please add it"
+            exit 1
+          }
 
+      # ========== USE EXISTING MEDAL.EXE (luau-lifter) ==========
+      - name: Add medal.exe to PATH
+        shell: pwsh
+        run: |
+          $medal = Get-ChildItem -Path . -Recurse -Filter "luau-lifter.exe" | Select-Object -First 1
+          if (-not $medal) { $medal = Get-ChildItem -Path . -Recurse -Filter "medal.exe" | Select-Object -First 1 }
+          if ($medal) {
+            $dir = $medal.DirectoryName
+            echo "$dir" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+            Write-Host "Found medal/luau-lifter in $dir"
+          } else {
+            Write-Host "medal.exe / luau-lifter.exe not found in repo – please add it"
+            exit 1
+          }
+
+      # ========== DOWNLOAD DARKLUA (since you don't have it) ==========
       - name: Install darklua
         shell: pwsh
         run: |
           $url = "https://github.com/seaofvoices/darklua/releases/download/v0.18.0/darklua-windows-x86_64.zip"
           Invoke-WebRequest -Uri $url -OutFile darklua.zip -UseBasicParsing
           Expand-Archive -Path darklua.zip -DestinationPath darklua_folder
-          Copy-Item "darklua_folder\darklua.exe" -Destination ".\darklua.exe"
-          echo "$pwd" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          # The zip may contain a single exe or a folder
+          $exe = Get-ChildItem -Path darklua_folder -Recurse -Filter "darklua.exe" | Select-Object -First 1
+          if ($exe) {
+            Copy-Item $exe.FullName -Destination "darklua.exe"
+            echo "$pwd" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          } else {
+            Write-Host "darklua.exe not found in extracted files"
+            exit 1
+          }
 
-      - name: Install ib2
-        shell: pwsh
-        run: |
-          # If you have ib2.exe in your repo, use that. Otherwise download.
-          $url = "https://github.com/NotDSF/ib2/releases/download/v1.0/ib2.exe"
-          Invoke-WebRequest -Uri $url -OutFile "ib2\main\ib2.exe"
-          echo "$pwd\ib2\main" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-
+      # ========== DOWNLOAD MOONSEC DEOBFUSCATOR (if not in repo) ==========
       - name: Install MoonsecDeobfuscator
         shell: pwsh
         run: |
-          $url = "https://github.com/fuad1508/MoonsecDeobfuscator/releases/download/v1.0/MoonsecDeobfuscator.zip"
-          Invoke-WebRequest -Uri $url -OutFile moonsec.zip -UseBasicParsing
-          Expand-Archive -Path moonsec.zip -DestinationPath MoonsecDeobfuscatorBin
-          # The exe is inside a subfolder; move it up
-          if (Test-Path "MoonsecDeobfuscatorBin/MoonsecDeobfuscator.exe") {
-            Move-Item "MoonsecDeobfuscatorBin/MoonsecDeobfuscator.exe" ".\MoonsecDeobfuscatorBin\"
-          } else {
-            # find it recursively
+          $existing = Get-ChildItem -Path . -Recurse -Filter "MoonsecDeobfuscator.exe" | Select-Object -First 1
+          if (-not $existing) {
+            $url = "https://github.com/fuad1508/MoonsecDeobfuscator/releases/download/v1.0/MoonsecDeobfuscator.zip"
+            Invoke-WebRequest -Uri $url -OutFile moonsec.zip -UseBasicParsing
+            Expand-Archive -Path moonsec.zip -DestinationPath MoonsecDeobfuscatorBin
+            # Move exe to the root of that folder
             $exe = Get-ChildItem -Path MoonsecDeobfuscatorBin -Recurse -Filter "*.exe" | Select-Object -First 1
-            if ($exe) { Move-Item $exe.FullName ".\MoonsecDeobfuscatorBin\MoonsecDeobfuscator.exe" }
-          }
-
-      - name: Install medal51 (luau-lifter)
-        shell: pwsh
-        run: |
-          $url = "https://github.com/red-blox/medal51/releases/download/0.1.2/medal51-windows-x64.zip"
-          Invoke-WebRequest -Uri $url -OutFile medal51.zip -UseBasicParsing
-          Expand-Archive -Path medal51.zip -DestinationPath medal51
-          # Ensure the exe is in medal51 folder
-          if (Test-Path "medal51/lua51-lifter.exe") {
-            # Already correct
+            if ($exe) {
+              Move-Item $exe.FullName -Destination "MoonsecDeobfuscatorBin\MoonsecDeobfuscator.exe" -Force
+            }
           } else {
-            Move-Item "medal51/*.exe" "medal51/lua51-lifter.exe" -ErrorAction SilentlyContinue
+            Write-Host "MoonsecDeobfuscator.exe already exists in repo – skipping download"
           }
 
-      - name: Install Luadec51
-        shell: pwsh
-        run: |
-          $url = "https://github.com/viruscamp/luadec/releases/download/2.1/luadec51.exe"
-          Invoke-WebRequest -Uri $url -OutFile "deobfuscate\Luadec51.exe"
-          $url2 = "https://github.com/tehkane/unluac/releases/download/v2023.05.11/unluac2023.05.11.jar"
-          Invoke-WebRequest -Uri $url2 -OutFile "deobfuscate\unluac.jar"
-
-      - name: Patch Lua require paths (fix .l command)
+      # ========== PATCH LUA REQUIRES (fix .l command) ==========
+      - name: Patch Lua require paths
         shell: pwsh
         run: |
           $files = @("httplog2.lua","exec_env.lua","MSecAntiTamper.lua","unpack_dumper.lua","badluaobf.lua","luraphdump.lua","loadstringlog.lua")
@@ -100,7 +106,8 @@ jobs:
             }
           }
 
-      - name: Run the full bot
+      # ========== RUN THE BOT ==========
+      - name: Run Discord bot
         env:
           DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
         shell: cmd
