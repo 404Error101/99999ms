@@ -2481,7 +2481,7 @@ class MyClient(discord.Client):
 if __name__ == "__main__":
     client = MyClient(intents=intents)
 
-    enter_token_here = None
+    enter_token_here = MTUwNDU3OTM4NDY1NTM1MTg1OA.GU7cKk.Msv385zJPPmHGG8-iWHRCrte3hzqpJ5l5HeLVs
 
     if not enter_token_here:
         print("PLEASE ENTER A TOKEN!! CHANGE THE = None line to = 'TOKEN'")
