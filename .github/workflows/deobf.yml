@@ -1,9 +1,9 @@
-name: Run 25ms Discord Bot
+name: Full 25ms Bot (All Commands)
 
 on:
-  workflow_dispatch:          # Manual trigger from Actions tab
+  workflow_dispatch:
   schedule:
-    - cron: '0 */6 * * *'     # Restart every 6 hours (optional)
+    - cron: '0 */6 * * *'
 
 jobs:
   run-bot:
@@ -17,22 +17,17 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Install Python dependencies
-        run: |
-          pip install discord.py aiohttp pillow requests
+      - name: Install Python deps
+        run: pip install discord.py aiohttp pillow requests
 
-      - name: Create required directories
+      - name: Create directories
         shell: cmd
         run: |
-          mkdir dumps\original
-          mkdir dumps\dumped
-          mkdir dumps\beautify
-          mkdir unobfuscated
-          mkdir obfuscated
-          mkdir deobfuscate\.in
-          mkdir deobfuscate\.out
+          mkdir dumps\original dumps\dumped dumps\beautify
+          mkdir unobfuscated obfuscated deobfuscate\.in deobfuscate\.out
+          mkdir MoonsecDeobfuscatorBin medal51 ib2\main
 
-      - name: Install Lune (for .l command)
+      - name: Install Lune
         shell: pwsh
         run: |
           $url = "https://github.com/lune-org/lune/releases/download/v0.10.4/lune-0.10.4-windows-x86_64.zip"
@@ -40,7 +35,60 @@ jobs:
           Expand-Archive -Path lune.zip -DestinationPath lune_folder
           echo "$pwd\lune_folder" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
-      - name: Patch Lua require paths
+      - name: Install darklua
+        shell: pwsh
+        run: |
+          $url = "https://github.com/seaofvoices/darklua/releases/download/v0.13.0/darklua-x86_64-pc-windows-msvc.zip"
+          Invoke-WebRequest -Uri $url -OutFile darklua.zip -UseBasicParsing
+          Expand-Archive -Path darklua.zip -DestinationPath darklua_folder
+          Copy-Item "darklua_folder\darklua.exe" -Destination ".\darklua.exe"
+          echo "$pwd" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Install ib2
+        shell: pwsh
+        run: |
+          # If you have ib2.exe in your repo, use that. Otherwise download.
+          $url = "https://github.com/NotDSF/ib2/releases/download/v1.0/ib2.exe"
+          Invoke-WebRequest -Uri $url -OutFile "ib2\main\ib2.exe"
+          echo "$pwd\ib2\main" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Install MoonsecDeobfuscator
+        shell: pwsh
+        run: |
+          $url = "https://github.com/fuad1508/MoonsecDeobfuscator/releases/download/v1.0/MoonsecDeobfuscator.zip"
+          Invoke-WebRequest -Uri $url -OutFile moonsec.zip -UseBasicParsing
+          Expand-Archive -Path moonsec.zip -DestinationPath MoonsecDeobfuscatorBin
+          # The exe is inside a subfolder; move it up
+          if (Test-Path "MoonsecDeobfuscatorBin/MoonsecDeobfuscator.exe") {
+            Move-Item "MoonsecDeobfuscatorBin/MoonsecDeobfuscator.exe" ".\MoonsecDeobfuscatorBin\"
+          } else {
+            # find it recursively
+            $exe = Get-ChildItem -Path MoonsecDeobfuscatorBin -Recurse -Filter "*.exe" | Select-Object -First 1
+            if ($exe) { Move-Item $exe.FullName ".\MoonsecDeobfuscatorBin\MoonsecDeobfuscator.exe" }
+          }
+
+      - name: Install medal51 (luau-lifter)
+        shell: pwsh
+        run: |
+          $url = "https://github.com/red-blox/medal51/releases/download/0.1.2/medal51-windows-x64.zip"
+          Invoke-WebRequest -Uri $url -OutFile medal51.zip -UseBasicParsing
+          Expand-Archive -Path medal51.zip -DestinationPath medal51
+          # Ensure the exe is in medal51 folder
+          if (Test-Path "medal51/lua51-lifter.exe") {
+            # Already correct
+          } else {
+            Move-Item "medal51/*.exe" "medal51/lua51-lifter.exe" -ErrorAction SilentlyContinue
+          }
+
+      - name: Install Luadec51
+        shell: pwsh
+        run: |
+          $url = "https://github.com/viruscamp/luadec/releases/download/2.1/luadec51.exe"
+          Invoke-WebRequest -Uri $url -OutFile "deobfuscate\Luadec51.exe"
+          $url2 = "https://github.com/tehkane/unluac/releases/download/v2023.05.11/unluac2023.05.11.jar"
+          Invoke-WebRequest -Uri $url2 -OutFile "deobfuscate\unluac.jar"
+
+      - name: Patch Lua require paths (fix .l command)
         shell: pwsh
         run: |
           $files = @("httplog2.lua","exec_env.lua","MSecAntiTamper.lua","unpack_dumper.lua","badluaobf.lua","luraphdump.lua","loadstringlog.lua")
@@ -52,7 +100,7 @@ jobs:
             }
           }
 
-      - name: Run Discord bot
+      - name: Run the full bot
         env:
           DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
         shell: cmd
