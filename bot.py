@@ -832,7 +832,8 @@ async def prom_deobf_api_cmd(msg):
             if resp.get("output"):
                 result = resp["output"]
                 webhooks = sexwebhooks(msg, content=result, attachfile=True)
-                await msg.reply(f"Deobfuscated using RELUA{webhooks and '\n'+webhooks or ''}", file=string_to_discordfile(await luabeautify(content=result), "deobfuscated.lua"))
+                suffix = f"\n{webhooks}" if webhooks else ""
+await msg.reply(f"Deobfuscated using RELUA{suffix}", file=...)
                 return
             elif resp.get("retry_after"):
                 await asyncio.sleep(resp["retry_after"])
