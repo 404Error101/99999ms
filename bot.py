@@ -2479,11 +2479,12 @@ class MyClient(discord.Client):
 
 
 if __name__ == "__main__":
+    import os
     client = MyClient(intents=intents)
 
-    enter_token_here = MTUwNDU3OTM4NDY1NTM1MTg1OA.GU7cKk.Msv385zJPPmHGG8-iWHRCrte3hzqpJ5l5HeLVs
+    token = os.environ.get("DISCORD_TOKEN")
+    if not token:
+        print("DISCORD_TOKEN environment variable not set.")
+        exit(1)
 
-    if not enter_token_here:
-        print("PLEASE ENTER A TOKEN!! CHANGE THE = None line to = 'TOKEN'")
-
-    client.run(enter_token_here)
+    client.run(token)
