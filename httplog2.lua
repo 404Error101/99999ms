@@ -77,7 +77,7 @@ local identifier=tostring(math.random(1000000,9999999))
 local __25mslocation="__25mslocation"..tostring(math.random(1000000,9999999))
 local Enum_NOCALL="NOCALL"..tostring(math.random(1000000,9999999))
 local _print=print
-local process = require("@lune/process")
+local process = require("@25msrequireluvsu/process")
 local is_bot=not not process.args[2]
 if is_bot then
         _print("-- wow this script had an infinite loop that wasnt resolved, this output was generated at runtime and is very bad.\n-- script id: "..tostring(process.args[1]))
@@ -229,10 +229,10 @@ local startt=clock()
 local commercial=false
 local inpath=commercial and "" or "dumps\\original\\"
 local outpath=commercial and "" or "dumps\\dumped\\"
-local fs = require("@lune/fs")
-local luau = require("@lune/luau")
-local JsonDecode=require("@lune/net").jsonDecode
-local task=require("@lune/task")
+local fs = require("@25msrequireluvsu/fs")
+local luau = require("@25msrequireluvsu/luau")
+local JsonDecode=require("@25msrequireluvsu/net").jsonDecode
+local task=require("@25msrequireluvsu/task")
 -- local buffer=require("bufferlib")
 local exec_env=require("./exec_env")
 local targetfilename=process.args[1]
@@ -264,7 +264,7 @@ if not (urlPath or fs.isFile(inpath..targetfilename)) then
     print("lol that file doesnt exist")
     return
 end
-local request=(require("@lune/net")).request
+local request=(require("@25msrequireluvsu/net")).request
 local input = urlPath and (function()
     local cont=request({url=urlPath:gsub("/loaders/","/l/"),method ="GET",headers={["User-Agent"]="Xeno/RobloxApp/V1.0.9"}}).body
     targetfilename=process.args[3]
