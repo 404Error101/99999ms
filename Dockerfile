@@ -22,8 +22,6 @@ ENV PATH="/opt/venv/bin:$PATH"
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Install darklua globally
-RUN npm install -g darklua
 
 # Install Lune (Official Lua Runtime)
 RUN curl -L https://github.com/lune-org/lune/releases/latest/download/lune-linux-x86_64.zip -o lune.zip \
