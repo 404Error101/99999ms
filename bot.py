@@ -2294,4 +2294,4 @@ class MyClient(discord.Client):
 
 if __name__ == "__main__":
     client = MyClient(intents=intents)
-    client.run("MTUwMDcxMDMxMDE1NDIwNzI0Mg.GgRWb7.0Hd7BKEhYSC3q-kKit3I_sSbL33qplZqXrwFjw")
+    client.run(os.getenv("DISCORD_TOKEN"))
