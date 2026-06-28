@@ -26,6 +26,54 @@ import aiohttp
 import ssl
 import certifi
 import urllib.parse
+import platform
+import shutil
+import sys
+from pathlib import Path
+
+# Platform detection and compatibility
+IS_LINUX = platform.system() == "Linux"
+
+def check_executable(name):
+    """Check if an executable is available in PATH"""
+    return shutil.which(name) is not None
+
+def check_file_exists(path):
+    """Check if a file exists"""
+    return Path(path).exists()
+
+def get_executable(base_name, windows_ext=".exe"):
+    """Get the correct executable name for the platform"""
+    if IS_LINUX:
+        # Try without .exe first, then with wine
+        if check_executable(base_name):
+            return base_name
+        elif check_executable(f"wine {base_name}{windows_ext}"):
+            return f"wine {base_name}{windows_ext}"
+        else:
+            return None
+    else:
+        if check_executable(f"{base_name}{windows_ext}"):
+            return f"{base_name}{windows_ext}"
+        return None
+
+def safe_subprocess_exec(*args, **kwargs):
+    """Wrapper for subprocess execution that handles missing executables"""
+    try:
+        return asyncio.create_subprocess_exec(*args, **kwargs)
+    except FileNotFoundError as e:
+        print(f"Warning: Command not found: {args[0]}")
+        # Return a dummy process object
+        class DummyProcess:
+            stdout = ""
+            stderr = f"Command not found: {args[0]}"
+            async def communicate(self):
+                return "", self.stderr
+            def kill(self):
+                pass
+            async def wait(self):
+                return 1
+        return DummyProcess()
 
 # Try to import obf_detect, but provide a fallback if it fails
 try:
@@ -750,16 +798,21 @@ async def deobfhandler(msg):
     if not randomfilename:
         return False, False, False
     basename = randomfilename[:-4]
-    process1 = await asyncio.create_subprocess_exec(
+    
+    if not check_executable("node"):
+        await msg.reply("Node.js is not installed. Please install node.js to use this command.")
+        return False, False, False
+        
+    process = await safe_subprocess_exec(
         *(['node', './index.js', f'./.in/{randomfilename}', f'./.out/{basename}.luac']),
         cwd='./deobfuscate',
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE
     )
-    stdout1, stderr1 = await process1.communicate()
-    process1.stdout = stdout1.decode("utf-8")
-    process1.stderr = stderr1.decode("utf-8")
-    return process1, basename, False
+    stdout1, stderr1 = await process.communicate()
+    process.stdout = stdout1.decode("utf-8")
+    process.stderr = stderr1.decode("utf-8")
+    return process, basename, False
 
 async def ib2_deobf(msg):
     result, filename, isfullcode = await deobfhandler(msg)
@@ -794,8 +847,14 @@ async def roblox_decompile_cmd(msg):
         return
     outpath = f'{decompile_dir}{randomfilename[:-1]}'
     os.makedirs(os.path.dirname(outpath), exist_ok=True)
-    process = await asyncio.create_subprocess_exec(
-        './medal51/luau-lifter.exe', f'{decompile_dir}{randomfilename}', "-e",
+    
+    lifter_exe = get_executable("./medal51/luau-lifter")
+    if not lifter_exe:
+        await msg.reply("Luau lifter is not available on this platform.")
+        return
+        
+    process = await safe_subprocess_exec(
+        lifter_exe, f'{decompile_dir}{randomfilename}', "-e",
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE
     )
@@ -1023,11 +1082,21 @@ async def obf77fus(msg):
         print(result.stdout)
 
 async def medal51_decompile_on_file(inpath, outpath):
-    process = await asyncio.create_subprocess_exec(
-        *(["./medal51/lua51-lifter.exe", "--file", inpath, "--out", outpath]),
+    if not check_file_exists(inpath):
+        print(f"File not found: {inpath}")
+        return None, False
+        
+    medal_exe = get_executable("./medal51/lua51-lifter")
+    if not medal_exe:
+        print("Medal51 decompiler not available")
+        return None, False
+        
+    process = await safe_subprocess_exec(
+        *([medal_exe, "--file", inpath, "--out", outpath]),
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE
     )
+    
     try:
         stdout_task = asyncio.create_task(read_stream(process.stdout))
         stderr_task = asyncio.create_task(read_stream(process.stderr))
@@ -1727,8 +1796,16 @@ async def getfile(msg, file_location=False, file_extension=".lua", usehash=False
 
 async def obfhandler(msg, addCG=False):
     await msg.channel.typing()
+    
+    if not check_executable("lua"):
+        await msg.reply("Lua is not installed. Please install lua to use this command.")
+        return
+        
     obfmode = (addCG and "ol") or (msg.content.lower().find(".obf weak") >= 0 and "Weak") or ((msg.content.lower().find(".minify") >= 0 and "Minify")) or ((msg.content.lower().find(".vmify") >= 0 and "Vmify") or ((msg.content.lower().find(".obf me") >= 0 and "me")) or "Normal")
     randomfilename = await getfile(msg, "./unobfuscated/")
+    if not randomfilename:
+        return
+        
     await applydarklua("unobfuscated/" + randomfilename, [
         "remove_empty_do",
         "remove_compound_assignment",
@@ -1739,8 +1816,12 @@ async def obfhandler(msg, addCG=False):
         "remove_floor_division",
     ])
 
+    if not check_file_exists("./cli.lua"):
+        await msg.reply("cli.lua not found. Please check the installation.")
+        return
+
     command = ['lua', './cli.lua', '--preset', obfmode, './unobfuscated/' + randomfilename, '--o', './obfuscated/' + randomfilename]
-    process = await asyncio.create_subprocess_exec(
+    process = await safe_subprocess_exec(
         *command,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE
@@ -1786,26 +1867,30 @@ async def luabeautify(path=None, additional_options=[], content=None):
                 pass
             return "-- ts file was generated at discord.gg/99ms\n\n" + result
         return True
-    command = ['node', 'luamin/beautify.js', path, path]
-    process = await asyncio.create_subprocess_exec(
-        *command,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE
-    )
-    await process.communicate()
-    if process.stderr:
-        return False
     
-    if content:
-        with open(path, "r", encoding="utf-8", errors="replace") as f:
-            result = f.read()
-        try:
-            os.remove(path)
-        except:
-            pass
-        return result
+    if check_executable("node") and check_file_exists("luamin/beautify.js"):
+        command = ['node', 'luamin/beautify.js', path, path]
+        process = await safe_subprocess_exec(
+            *command,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        await process.communicate()
+        if process.stderr:
+            return False
+        
+        if content:
+            with open(path, "r", encoding="utf-8", errors="replace") as f:
+                result = f.read()
+            try:
+                os.remove(path)
+            except:
+                pass
+            return result
+        
+        return True
     
-    return True
+    return False
 
 async def applydarklua(filepath, options=False, generator="readable", header=None):
     if not options:
@@ -1855,24 +1940,52 @@ async def luafilehandler(msg, luafile, inpath, outpath=None, lune=False, ib2=Fal
     except:
         pass
 
-    command = (
-        ['lune', 'run', f'./{luafile}', uselink or randomfilename] if lune else
-        ["./ib2/main/ib2.exe", f"./unobfuscated/{randomfilename}"] if ib2 else
-        ["./77fus/77fus.exe", f"./unobfuscated/{randomfilename}", "./obfuscated/" + randomfilename] if ssfus else
-        ["./MoonsecDeobfuscatorBin/MoonsecDeobfuscator.exe", "-dev", "-i", f"{inpath}{randomfilename}", "-o", f"{outpath}{randomfilename}c"] if msdeobf else
-        ['lua', f'./{luafile}', randomfilename]
-    )
+    if lune:
+        if not check_executable("lune"):
+            await msg.reply("Lune is not installed. Please install lune to use this command.")
+            return False, False
+        command = ['lune', 'run', f'./{luafile}', uselink or randomfilename]
+    elif ib2:
+        ib2_exe = get_executable("./ib2/main/ib2")
+        if not ib2_exe:
+            await msg.reply("IB2 obfuscator is not available on this platform.")
+            return False, False
+        command = [ib2_exe, f"./unobfuscated/{randomfilename}"]
+        if msg.content.startswith(".ibs"):
+            command.append("REAL")
+    elif ssfus:
+        ssfus_exe = get_executable("./77fus/77fus")
+        if not ssfus_exe:
+            await msg.reply("77fus obfuscator is not available on this platform.")
+            return False, False
+        command = [ssfus_exe, f"./unobfuscated/{randomfilename}", "./obfuscated/" + randomfilename]
+    elif msdeobf:
+        msdeobf_exe = get_executable("./MoonsecDeobfuscatorBin/MoonsecDeobfuscator")
+        if not msdeobf_exe:
+            await msg.reply("Moonsec deobfuscator is not available on this platform.")
+            return False, False
+        command = [msdeobf_exe, "-dev", "-i", f"{inpath}{randomfilename}", "-o", f"{outpath}{randomfilename}c"]
+    else:
+        if not check_executable("lua"):
+            await msg.reply("Lua is not installed. Please install lua to use this command.")
+            return False, False
+        command = ['lua', f'./{luafile}', randomfilename]
+
     if user_based:
         command.append(str(msg.author.id))
-    if uselink:
+    if uselink and not lune:
         command.append(randomfilename)
-    if ib2 and msg.content.startswith(".ibs"):
-        command.append("REAL")
-    process = await asyncio.create_subprocess_exec(
-        *command,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE
-    )
+
+    try:
+        process = await safe_subprocess_exec(
+            *command,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+    except Exception as e:
+        print(f"Error executing command: {e}")
+        await msg.reply(f"Error executing command. Please check that all dependencies are installed.")
+        return False, False
 
     try:
         stdout_task = asyncio.create_task(read_stream(process.stdout))
@@ -2294,4 +2407,8 @@ class MyClient(discord.Client):
 
 if __name__ == "__main__":
     client = MyClient(intents=intents)
-    client.run(os.getenv("DISCORD_TOKEN"))
+    token = os.getenv("DISCORD_TOKEN")
+    if not token:
+        print("Error: DISCORD_TOKEN environment variable not set!")
+        sys.exit(1)
+    client.run(token)
